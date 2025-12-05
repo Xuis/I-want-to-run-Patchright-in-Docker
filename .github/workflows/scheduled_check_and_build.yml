@@ -55,6 +55,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase repo owner
+        id: owner_lc
+        run: echo "owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+
       - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v4
         with:
@@ -62,8 +67,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ toLower(github.repository_owner) }}/patchright:${{ steps.get_release.outputs.tag }}
-            ghcr.io/${{ toLower(github.repository_owner) }}/patchright:latest
+            ghcr.io/${{ steps.owner_lc.outputs.owner_lc }}/patchright:${{ steps.get_release.outputs.tag }}
+            ghcr.io/${{ steps.owner_lc.outputs.owner_lc }}/patchright:latest
+
 
 
       - name: Update .last_patchright_release and push
