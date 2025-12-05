@@ -1,0 +1,9 @@
+services:
+  patchright:
+    image: #TODO Wherever I end up putting the image
+    container_name: patchright
+    restart: unless-stopped
+    volumes:
+      - /dev/shm:/dev/shm           # ai said this would sometimes helps browser stability. I don't know about this
+    environment:
+      # - NODE_ENV=production   # ai suggested this, I am doubting it.
