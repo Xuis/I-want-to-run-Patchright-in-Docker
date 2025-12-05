@@ -1,72 +1,54 @@
-# I'm building this with a couple references. chatgpt got me started, but did poorly as always. 
-# https://dev.to/willvelida/pushing-container-images-to-github-container-registry-with-github-actions-1m6b
-# This article seems like a good place to start
-name: Scheduled Patchright Build
+name: scheduled-check-and-build
 
-# Run on a schedule (every 4 hours) and allow manual dispatch
+# Run every 4 hours + allow manual trigger
 on:
-  # schedule:
-  #   - cron: '0 */4 * * *'   # every 4 hours
-  # workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'   # every 4 hours
+  workflow_dispatch:
 
-# Minimal permissions required:
 permissions:
-  contents: write   # needed to commit last_release.txt
-  packages: write   # needed to push to ghcr.io
-  id-token: write
+  contents: write     # so the workflow can update the .last_patchright_release file
+  packages: write     # allow pushing to GHCR via GITHUB_TOKEN
 
 jobs:
   check-and-build:
     runs-on: ubuntu-latest
+    env:
+      UPSTREAM_OWNER: Kaliiiiiiiiii-Vinyzu
+      UPSTREAM_REPO: patchright
+      IMAGE_NAME: patchright
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Install jq (if not already present)
+      - name: Get latest upstream Patchright release tag
+        id: get_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const owner = process.env.UPSTREAM_OWNER;
+            const repo = process.env.UPSTREAM_REPO;
+            try {
+              const release = await github.rest.repos.getLatestRelease({ owner, repo });
+              const tag = release.data.tag_name || release.data.name || "";
+              core.setOutput("tag", tag);
+            } catch (err) {
+              // If upstream has no releases, fallback to empty tag
+              core.setOutput("tag", "");
+            }
+
+      - name: Read previous stored release tag
+        id: read_prev
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
+          echo "prev=$(cat .last_patchright_release 2>/dev/null || true)" >> $GITHUB_OUTPUT
 
-      - name: Query upstream Patchright latest release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Querying GitHub API for latest release..."
-          latest=$(curl -s -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases/latest" \
-            | jq -r .tag_name)
-          if [ -z "$latest" ] || [ "$latest" = "null" ]; then
-            echo "Could not determine latest release tag. Aborting."
-            exit 1
-          fi
-          echo "latest=$latest" >> $GITHUB_ENV
-          echo "Found latest upstream release: $latest"
-
-      - name: Read stored last release (if any)
-        id: read_release
-        run: |
-          if [ -f last_release.txt ]; then
-            stored=$(cat last_release.txt | tr -d '\n')
-          else
-            stored=""
-          fi
-          echo "stored=$stored" >> $GITHUB_OUTPUT
-
-      - name: Compare versions and exit if unchanged
-        run: |
-          echo "Upstream latest: $LATEST"
-          echo "Stored last release: ${{ steps.read_release.outputs.stored }}"
-          if [ "$LATEST" = "${{ steps.read_release.outputs.stored }}" ]; then
-            echo "No new release detected. Exiting workflow."
-            exit 0
-          fi
-          echo "New release detected: $LATEST"
-
-      - name: Log in to GitHub Container Registry (GHCR)
+      # Only run build + push if tags differ
+      - name: Login to GitHub Container Registry (ghcr.io)
+        if: ${{ steps.get_release.outputs.tag != steps.read_prev.outputs.prev }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -74,23 +56,30 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image to GHCR
+        if: ${{ steps.get_release.outputs.tag != steps.read_prev.outputs.prev }}
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./dockerfile
+          file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/patchright-playwright:${{ env.latest }}
-            ghcr.io/${{ github.repository_owner }}/patchright-playwright:latest
-          # optional: set platform/build args if needed
-          # platforms: linux/amd64
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.get_release.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+          # Optionally set platforms or build-args if needed:
+          # platforms: linux/amd64,linux/arm64
 
-      - name: Record new release and push to repo
-        env:
-          LATEST: ${{ env.latest }}
+      - name: Update .last_patchright_release and push
+        if: ${{ steps.get_release.outputs.tag != steps.read_prev.outputs.prev }}
         run: |
-          echo "${LATEST}" > last_release.txt
-          git add last_release.txt
-          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" commit -m "Update last_release to ${LATEST}" || echo "Nothing to commit"
-          git push
+          NEW_TAG="${{ steps.get_release.outputs.tag }}"
+          # write the new tag (file in repo)
+          echo "${NEW_TAG}" > .last_patchright_release
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .last_patchright_release
+          git commit -m "ci: update last seen patchright release -> ${NEW_TAG}" || echo "no changes to commit"
+          git push origin HEAD:${{ github.ref_name }}
 
+      - name: No-op (no new release)
+        if: ${{ steps.get_release.outputs.tag == steps.read_prev.outputs.prev }}
+        run: echo "No new upstream Patchright release detected (tag: ${{ steps.get_release.outputs.tag }})."
