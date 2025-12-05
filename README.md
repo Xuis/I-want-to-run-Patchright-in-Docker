@@ -12,6 +12,7 @@ Then I should be able to let this script do it's thing unattended, and never loo
 Files:   
 - README.md - This is what you're reading now. General information that is meant to be read first.  
 - dockerfile - this creates the docker image by starting with the playwrite image, and running some commands to install the latest versions of stuff.  
-- scheduled_check_and_build.yml - This is the GitHub Actions. It runs every few hours and looks at patchright's current release number, and checks if it's new. If new, it runs the docker build script (dockerfile) and pushes the result to GitHub Container Repo  
+- scheduled_check_and_build.yml - This is the GitHub Actions. It runs every few hours and looks at patchright's current release number, and checks if it's new. If new, it runs the docker build script (dockerfile) and pushes the result to GitHub Container Repo
+- docker-compose.yml - Ideally, you can make some minor edits to this and copy the contents to your docker compose system to run the generated image.
 
 This script is just bashing a few other people's products together (Playwrite, Patchright, Docker, Docker Compose, GitHub), so you have to obey all of their terms of service and rules.
