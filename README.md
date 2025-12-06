@@ -1,18 +1,24 @@
 # I Want To Run Patchright in Docker  
 This doesn't work yet. Come back later.  
-Why can't I run patchright in docker? I don't know why somebody hasn't done this before me, so lets find out together. I want it to be a drop-in replacement for Playwrite docker, so I can just point stuff to the open port, and it'll use Patchright instead of Playwrite. I'm probably making some assumptions that will break it along the way, but I'd like to learn about Playwrite, GitHub actions, and Docker, so lets figure it out.
+Why can't I run patchright in docker? I don't know why somebody hasn't done this before me, so lets find out together. I want it to be a drop-in replacement for Playwright docker, so I can just point stuff to the open port, and it'll use Patchright instead of Playwright. I'm probably making some assumptions that will break it along the way, but I'd like to learn about Playwright, GitHub actions, and Docker, so lets figure it out.
 
 I want to make something that:  
 1. Watches the releases for Patchright https://github.com/Kaliiiiiiiiii-Vinyzu/patchright  
-2. When it detects a new version for Patchright is released, build a docker container with the official Playwrite image (https://hub.docker.com/r/microsoft/playwright) and patch it with Patchwrite
+2. When it detects a new version for Patchright is released, build a docker container with the official Playwright image (https://hub.docker.com/r/microsoft/playwright) and patch it with Patchwrite
 3. Pushes the docker container to a public repository
 
 Then I should be able to let this script do it's thing unattended, and never look at this repository again. This will probably break at some point, and since I don't know what I'm doing, I won't be able to fix it. But maybe it'll be nice in the meantime!
 
 Files:   
 - README.md - This is what you're reading now. General information that is meant to be read first.  
-- dockerfile - this creates the docker image by starting with the playwrite image, and running some commands to install the latest versions of stuff.  
+- dockerfile - this creates the docker image by starting with the Playwright image, and running some commands to install the latest versions of stuff.  
 - scheduled_check_and_build.yml - This is the GitHub Actions. It runs every few hours and looks at patchright's current release number, and checks if it's new. If new, it runs the docker build script (dockerfile) and pushes the result to GitHub Container Repo
 - docker-compose.yml - Ideally, you can make some minor edits to this and copy the contents to your docker compose system to run the generated image.
 
-This script is just bashing a few other people's products together (Playwrite, Patchright, Docker, Docker Compose, GitHub), so you have to obey all of their terms of service and rules.
+This script is just bashing a few other people's products together (Playwright, Patchright, Docker, Docker Compose, GitHub), so you have to obey all of their terms of service and rules.
+
+To Do:
+[] Learn how the normal Playwright image acts. API?
+[] See if installing Patchright just works. Probably not.
+[] Find a way in the container to automatically wrap any API calls and send them to Patchright
+[] Write a test that runs on every build to make sure it's working correctly and lets me know if anything breaks
